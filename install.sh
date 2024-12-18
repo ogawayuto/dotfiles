@@ -94,7 +94,7 @@ handle_existing_file() {
     warn "A $type already exists: $dst ($(basename "$src"))"
     warn "What do you want to do? [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all"
     local action
-    read -r action < /dev/tty
+    read -r -k1 action
     echo
 
     case "$action" in
@@ -221,7 +221,7 @@ main() {
     install_dependencies
     echo ''
     success "All installed!"
-    source '~/.zshrc'
+    source ~/.zshrc
 }
 
 main "$@"
