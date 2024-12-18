@@ -1,156 +1,193 @@
 #!/usr/bin/env bash
 #
-# bootstrap installs things.
+# Dotfiles installation script
+# This script sets up dotfiles and configures git settings
 
-cd "$(dirname "$0")"
-DOTFILES_ROOT=$(pwd -P)
+# Exit on error, undefined variable, pipe failure
+set -euo pipefail
 
-set -e
+# Constants
+readonly SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+readonly DOTFILES_ROOT="$(cd "${SCRIPT_DIR}" && pwd -P)"
+readonly COLOR_INFO="\033[00;34m"
+readonly COLOR_WARN="\033[0;33m"
+readonly COLOR_SUCCESS="\033[00;32m"
+readonly COLOR_ERROR="\033[0;31m"
+readonly COLOR_RESET="\033[0m"
 
-echo ''
-
-info () {
-  printf "\r  [ \033[00;34m..\033[0m ] $1\n"
+# Message display functions
+print_message() {
+    local color="$1"
+    local message="$2"
+    local prefix="$3"
+    printf "\r  [ ${color}${prefix}${COLOR_RESET} ] %s\n" "$message"
 }
 
-user () {
-  printf "\r  [ \033[0;33m??\033[0m ] $1\n"
+info() { print_message "$COLOR_INFO" "$1" ".." ; }
+warn() { print_message "$COLOR_WARN" "$1" "??" ; }
+success() { print_message "$COLOR_SUCCESS" "$1" "OK" ; }
+error() { print_message "$COLOR_ERROR" "$1" "FAIL" ; echo ''; exit 1; }
+
+# Git configuration
+get_git_credential_helper() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        echo "osxkeychain"
+    else
+        echo "cache"
+    fi
 }
 
-success () {
-  printf "\r\033[2K  [ \033[00;32mOK\033[0m ] $1\n"
-}
-
-fail () {
-  printf "\r\033[2K  [\033[0;31mFAIL\033[0m] $1\n"
-  echo ''
-  exit
-}
-
-setup_gitconfig () {
-  if ! [ -f git/gitconfig.local.symlink ]
-  then
-    info 'setup gitconfig'
-
-    git_credential='cache'
-    if [ "$(uname -s)" == "Darwin" ]
-    then
-      git_credential='osxkeychain'
+setup_gitconfig() {
+    local git_config_path="git/gitconfig.local.symlink"
+    
+    if [ -f "$git_config_path" ]; then
+        info "Git config already exists, skipping setup"
+        return 0
     fi
 
-    user ' - What is your github author name?'
-    read -e git_authorname
-    user ' - What is your github author email?'
-    read -e git_authoremail
+    info "Setting up gitconfig"
+    local git_credential
+    git_credential="$(get_git_credential_helper)"
 
-    sed -e "s/AUTHORNAME/$git_authorname/g" -e "s/AUTHOREMAIL/$git_authoremail/g" -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" git/gitconfig.local.symlink.example > git/gitconfig.local.symlink
+    warn "What is your github author name?"
+    read -r git_authorname
+    warn "What is your github author email?"
+    read -r git_authoremail
 
-    success 'gitconfig'
-  fi
+    sed -e "s/AUTHORNAME/$git_authorname/g" \
+        -e "s/AUTHOREMAIL/$git_authoremail/g" \
+        -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" \
+        "${git_config_path}.example" > "$git_config_path"
+
+    success "Git configuration completed"
 }
 
+# File management
+handle_existing_file() {
+    local dst="$1"
+    local src="$2"
+    local currentSrc
+    
+    if [ -L "$dst" ]; then
+        currentSrc="$(readlink "$dst")"
+        if [ "$currentSrc" = "$src" ]; then
+            # 既に正しいリンクが存在する場合
+            echo "already_exists"
+            return 0
+        fi
+    fi
 
-link_file () {
-  local src=$1 dst=$2
+    warn "File already exists: $dst ($(basename "$src")), what do you want to do?
+    [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all?"
+    
+    local action
+    read -r -n 1 action
+    echo
 
-  local overwrite= backup= skip=
-  local action=
+    case "$action" in
+        [oO]) echo "overwrite";;
+        [bB]) echo "backup";;
+        [sS]) echo "skip";;
+        *) return 0;;
+    esac
+}
 
-  if [ -f "$dst" -o -d "$dst" -o -L "$dst" ]
-  then
-
-    if [ "$overwrite_all" == "false" ] && [ "$backup_all" == "false" ] && [ "$skip_all" == "false" ]
-    then
-
-      local currentSrc="$(readlink $dst)"
-
-      if [ "$currentSrc" == "$src" ]
-      then
-
-        skip=true;
-
-      else
-
-        user "File already exists: $dst ($(basename "$src")), what do you want to do?\n\
-        [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all?"
-        read -n 1 action
-
-        case "$action" in
-          o )
-            overwrite=true;;
-          O )
-            overwrite_all=true;;
-          b )
-            backup=true;;
-          B )
-            backup_all=true;;
-          s )
-            skip=true;;
-          S )
-            skip_all=true;;
-          * )
+create_link() {
+    local src="$1"
+    local dst="$2"
+    local action="$3"
+    local filename="$(basename "$src")"
+    
+    case "$action" in
+        "already_exists")
+            info "Checking $filename..."
+            success "Correct link already exists, skipping"
             ;;
-        esac
-
-      fi
-
-    fi
-
-    overwrite=${overwrite:-$overwrite_all}
-    backup=${backup:-$backup_all}
-    skip=${skip:-$skip_all}
-
-    if [ "$overwrite" == "true" ]
-    then
-      rm -rf "$dst"
-      success "removed $dst"
-    fi
-
-    if [ "$backup" == "true" ]
-    then
-      mv "$dst" "${dst}.backup"
-      success "moved $dst to ${dst}.backup"
-    fi
-
-    if [ "$skip" == "true" ]
-    then
-      success "skipped $src"
-    fi
-  fi
-
-  if [ "$skip" != "true" ]  # "false" or empty
-  then
-    ln -s "$1" "$2"
-    success "linked $1 to $2"
-  fi
+        "overwrite")
+            info "Removing existing $filename..."
+            rm -rf "$dst"
+            success "Removed $dst"
+            info "Creating link for $filename..."
+            ln -s "$src" "$dst"
+            success "Linked $src to $dst"
+            ;;
+        "backup")
+            info "Creating backup of $filename..."
+            mv "$dst" "${dst}.backup"
+            success "Moved $dst to ${dst}.backup"
+            info "Creating link for $filename..."
+            ln -s "$src" "$dst"
+            success "Linked $src to $dst"
+            ;;
+        "skip")
+            info "Skipping $filename..."
+            success "Skipped $src"
+            ;;
+    esac
 }
 
-install_dotfiles () {
-  info 'installing dotfiles'
+link_file() {
+    local src="$1"
+    local dst="$2"
+    local current="$3"
+    local total="$4"
+    local filename="$(basename "$src")"
 
-  local overwrite_all=false backup_all=false skip_all=false
+    info "Processing file ($current/$total): $filename"
 
-  for src in $(find -H "$DOTFILES_ROOT" -maxdepth 2 -name '*.symlink' -not -path '*.git*')
-  do
-    dst="$HOME/.$(basename "${src%.*}")"
-    link_file "$src" "$dst"
-  done
+    if [ -f "$dst" ] || [ -d "$dst" ] || [ -L "$dst" ]; then
+        local action
+        action=$(handle_existing_file "$dst" "$src")
+        create_link "$src" "$dst" "$action"
+    else
+        info "Creating new link for $filename..."
+        ln -s "$src" "$dst"
+        success "Linked $src to $dst"
+    fi
+    echo ''
 }
 
-setup_gitconfig
-install_dotfiles
+install_dotfiles() {
+    info "Installing dotfiles"
+    echo ''
+    
+    # Count total files first
+    local total_files
+    total_files=$(find -H "$DOTFILES_ROOT" -maxdepth 2 -name '*.symlink' -not -path '*.git*' | wc -l)
+    info "Found $total_files files to process"
+    echo ''
+    
+    local current=0
+    while IFS= read -r src; do
+        current=$((current + 1))
+        local dst="$HOME/.$(basename "${src%.*}")"
+        link_file "$src" "$dst" "$current" "$total_files"
+    done < <(find -H "$DOTFILES_ROOT" -maxdepth 2 -name '*.symlink' -not -path '*.git*')
+    
+    success "All dotfiles have been processed"
+}
 
-# If we're on a Mac, let's install and setup homebrew.
-if [ "$(uname -s)" == "Darwin" ]
-then
-  info "installing dependencies"
-  if source bin/dot | while read -r data; do info "$data"; done
-  then
-    success "dependencies installed"
-  else
-    fail "error installing dependencies"
-  fi
-fi
+# Dependencies installation
+install_dependencies() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        info "Installing dependencies"
+        if source "bin/dot" | while read -r data; do info "$data"; done; then
+            success "Dependencies installed"
+        else
+            error "Error installing dependencies"
+        fi
+    fi
+}
 
-echo ''
-echo '  All installed!'
+# Main execution
+main() {
+    echo ''
+    setup_gitconfig
+    echo ''
+    install_dotfiles
+    install_dependencies
+    echo ''
+    success "All installed!"
+}
+
+main "$@"
