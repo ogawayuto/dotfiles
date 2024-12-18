@@ -104,7 +104,7 @@ handle_existing_file() {
         B ) echo "backup_all";;
         s ) echo "skip";;
         S ) echo "skip_all";;
-        * ) echo "skip";;
+        * ) echo "overwrite";;
     esac
 }
 
@@ -221,6 +221,7 @@ main() {
     install_dependencies
     echo ''
     success "All installed!"
+    source '~/.zshrc'
 }
 
 main "$@"
