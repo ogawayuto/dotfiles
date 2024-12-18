@@ -69,7 +69,6 @@ handle_existing_file() {
     local filename="$(basename "$src")"
     local type=""
     
-    # 既存のファイルタイプを判定
     if [ -L "$dst" ]; then
         type="symbolic link"
     elif [ -d "$dst" ]; then
@@ -78,8 +77,6 @@ handle_existing_file() {
         type="file"
     fi
     
-
-    # シンボリックリンクの場合、リンク先を確認
     if [ -L "$dst" ]; then
         local currentSrc
         currentSrc="$(readlink "$dst")"
@@ -92,20 +89,25 @@ handle_existing_file() {
     fi
 
     warn "A $type already exists: $dst ($(basename "$src"))"
-    warn "What do you want to do? [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all"
-    local action
-    read -r -k1 action
-    echo
+    if [ -t 0 ]; then  # 端末から入力を読み取れる場合
+        warn "What do you want to do? [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all"
+        local action
+        read -r -k1 action
+        echo
 
-    case "$action" in
-        o ) echo "overwrite";;
-        O ) echo "overwrite_all";;
-        b ) echo "backup";;
-        B ) echo "backup_all";;
-        s ) echo "skip";;
-        S ) echo "skip_all";;
-        * ) echo "overwrite";;
-    esac
+        case "$action" in
+            o ) echo "overwrite";;
+            O ) echo "overwrite_all";;
+            b ) echo "backup";;
+            B ) echo "backup_all";;
+            s ) echo "skip";;
+            S ) echo "skip_all";;
+            * ) echo "skip";;
+        esac
+    else  # 端末から入力を読み取れない場合
+        info "No terminal detected - defaulting to overwrite"
+        echo "overwrite"
+    fi
 }
 
 create_link() {
