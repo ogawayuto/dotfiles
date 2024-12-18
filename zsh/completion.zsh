@@ -6,6 +6,8 @@ zstyle ':completion:*' insert-tab pending
 
 zstyle ':completion:*' completer _complete _approximate _prefix
 
-zstyle ':completion:*:approximate' max-errors 2 NUMERIC
+zstyle ':completion:*:approximate' max-errors 2 
+
+zstyle ':completion:*:default' menu select=1 
 
 
