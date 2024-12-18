@@ -1,3 +1,21 @@
+# Dotfiles for general use
+This repository is forked from holman dotfiles([github](https://github.com/holman/dotfiles))
+This is for linux system, not on Mac, so Brew and macos folder are removed.
+Adding some style and autocompletion setting to zsh.
+
+# For install
+dotfiles can be installed by install.sh in root directory.
+```sh
+git clone https://github.com/holman/dotfiles.git ~/.dotfiles
+cd ~/.dotifiles
+sh install.sh
+```
+This repository is applicable to devcontainer. DevContainer supports dotifiles repository([Docs](https://code.visualstudio.com/docs/devcontainers/containers#_personalizing-with-dotfile-repositories)).
+___
+
+
+The original readme.md below.
+
 # holman does dotfiles
 
 Your dotfiles are how you personalize your system. These are mine.
