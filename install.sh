@@ -94,7 +94,7 @@ handle_existing_file() {
     warn "A $type already exists: $dst ($(basename "$src"))"
     warn "What do you want to do? [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all"
     local action
-    read -r -n 1 action < /dev/tty
+    read -r action < /dev/tty
     echo
 
     case "$action" in
