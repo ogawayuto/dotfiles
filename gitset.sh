@@ -214,13 +214,13 @@ install_dependencies() {
 
 # Main execution
 main() {
-    # echo ''
-    # setup_gitconfig
+    echo ''
+    setup_gitconfig
     echo ''
     install_dotfiles
     install_dependencies
     echo ''
-    success "All installed!"
+    success "Git config set and All installed!"
 }
 
 main "$@"
