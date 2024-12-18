@@ -20,7 +20,7 @@ print_message() {
     local color="$1"
     local message="$2"
     local prefix="$3"
-    printf "\r  [ ${color}${prefix}${COLOR_RESET} ] %s\n" "$message"
+    printf "\r  [ ${color}${prefix}${COLOR_RESET} ] %s\n" "$message" >&2
 }
 
 info() { print_message "$COLOR_INFO" "$1" ".." ; }
@@ -77,6 +77,7 @@ handle_existing_file() {
     elif [ -f "$dst" ]; then
         type="file"
     fi
+    
 
     # シンボリックリンクの場合、リンク先を確認
     if [ -L "$dst" ]; then
@@ -93,7 +94,7 @@ handle_existing_file() {
     warn "A $type already exists: $dst ($(basename "$src"))"
     warn "What do you want to do? [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all"
     local action
-    read -r -n 1 action
+    read -r -n 1 action < /dev/tty
     echo
 
     case "$action" in
@@ -146,7 +147,7 @@ link_file() {
     local overwrite_all="$5"
     local backup_all="$6"
     local skip_all="$7"
-
+    local action
     info "Processing file ($current/$total): $filename"
 
     if [ -f "$dst" ] || [ -d "$dst" ] || [ -L "$dst" ]; then
@@ -156,9 +157,8 @@ link_file() {
             create_link "$src" "$dst" "backup_all"
         elif [ "$skip_all" = "true" ]; then
             create_link "$src" "$dst" "skip_all"
-        else
-            local action
-            action=$(handle_existing_file "$dst" "$src")
+        else 
+            action=$(handle_existing_file "$dst" "$src" | tr -d '[:space:]')
             create_link "$src" "$dst" "$action"
         fi
     else
@@ -166,7 +166,7 @@ link_file() {
         ln -s "$src" "$dst"
         success "Linked $src to $dst"
     fi
-    echo ''
+    echo "$action"
 }
 
 install_dotfiles() {
@@ -183,18 +183,18 @@ install_dotfiles() {
     local overwrite_all=false
     local backup_all=false
     local skip_all=false
-
+    
     while IFS= read -r src; do
         current=$((current + 1))
         local dst="$HOME/.$(basename "${src%.*}")"
-        link_file "$src" "$dst" "$current" "$total_files" "$overwrite_all" "$backup_all" "$skip_all"
-        
+        local returned_action=$(link_file "$src" "$dst" "$current" "$total_files" "$overwrite_all" "$backup_all" "$skip_all")
         # Update all flags based on last action
-        case "$(handle_existing_file "$dst" "$src")" in
-            "overwrite_all") overwrite_all=true; backup_all=false; skip_all=false;;
-            "backup_all") overwrite_all=false; backup_all=true; skip_all=false;;
-            "skip_all") overwrite_all=false; backup_all=false; skip_all=true;;
+        case "$returned_action" in
+            "overwrite_all") overwrite_all=true; backup_all=false; skip_all=false ;;
+            "backup_all") overwrite_all=false; backup_all=true; skip_all=false ;;
+            "skip_all") info "aaa"; overwrite_all=false; backup_all=false; skip_all=true ;;
         esac
+        echo ''
     done < <(find -H "$DOTFILES_ROOT" -maxdepth 2 -name '*.symlink' -not -path '*.git*')
     
     success "All dotfiles have been processed"
