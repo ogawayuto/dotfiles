@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/zsh
 #
 # Dotfiles installation script
 # This script sets up dotfiles and configures git settings
