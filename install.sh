@@ -214,11 +214,16 @@ install_dependencies() {
     fi
 }
 
+install_software() {
+    curl -sS https://starship.rs/install.sh | sh -s -- --yes
+}
+
 # Main execution
 main() {
     # echo ''
     # setup_gitconfig
     echo ''
+    install_software
     install_dotfiles
     install_dependencies
     echo ''
